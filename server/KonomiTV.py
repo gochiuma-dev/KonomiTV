@@ -33,6 +33,7 @@ from app.constants import (
     BASE_DIR,
     DATABASE_CONFIG,
     KONOMITV_ACCESS_LOG_PATH,
+    INTERNAL_HOST,
     LIBRARY_PATH,
     LOGGING_CONFIG,
     RESTART_REQUIRED_LOCK_PATH,
@@ -108,8 +109,9 @@ def main(
     ## AMD64 : Windows (x64)
     ## x86_64: Linux (x64)
     ## aarch64: Linux (arm64)
+    ## arm64: macOS (Apple Silicon)
     current_arch = platform.machine()
-    if current_arch not in ['AMD64', 'x86_64', 'aarch64']:
+    if current_arch not in ['AMD64', 'x86_64', 'aarch64', 'arm64']:
         logging.error(f'KonomiTV は {current_arch} アーキテクチャに対応していません。')
         sys.exit(1)
 
@@ -122,6 +124,9 @@ def main(
             continue
         # arm64 の場合、x64 のみの QSVEncC・NVEncC・VCEEncC はチェックしない
         if current_arch == 'aarch64' and library_name in ['QSVEncC', 'NVEncC', 'VCEEncC']:
+            continue
+        # macOS の場合、QSVEncC・NVEncC・VCEEncC・rkmppenc はいずれも使えないのでチェックしない
+        if sys.platform == 'darwin' and library_name in ['QSVEncC', 'NVEncC', 'VCEEncC', 'rkmppenc']:
             continue
         if Path(library_path).is_file() is False:
             logging.error(f'{library_name} がサードパーティーライブラリとして配置されていないため、KonomiTV を起動できません。')
@@ -155,7 +160,7 @@ def main(
             [
                 LIBRARY_PATH['Akebi'],
                 '--listen-address', f'0.0.0.0:{CONFIG.server.port}',
-                '--proxy-pass-url', f'http://127.0.0.77:{CONFIG.server.port + 10}/',
+                '--proxy-pass-url', f'http://{INTERNAL_HOST}:{CONFIG.server.port + 10}/',
                 '--keyless-server-url', 'https://akebi.konomi.tv/',
                 *custom_https_certificate,  # カスタム HTTPS 証明書/秘密鍵を指定する引数を追加（指定されているときのみ）
             ],
@@ -174,7 +179,7 @@ def main(
         # リッスンするアドレス
         ## サーバーへのすべてのアクセスには一度 Akebi のリバースプロキシを通す
         ## 混乱を避けるため、容易にアクセスされないだろう 127.0.0.77 のみでリッスンしている
-        host = '127.0.0.77',
+        host = INTERNAL_HOST,
         # リッスンするポート番号
         ## 指定されたポートに 10 を足したもの
         port = CONFIG.server.port + 10,
@@ -210,9 +215,10 @@ def main(
         # psycopg3 バックエンドが SelectorEventLoop しか対応していない件の対策らしいが、KonomiTV では SQLite を利用しているため問題ない
         # ref: https://github.com/tortoise/aerich/pull/251
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-    else:
+    elif sys.platform == 'linux':
         import uvloop
         uvloop.install()
+    # macOS では通常の asyncio のイベントループを使う (uvloop は Linux のみ依存関係に入っている)
 
     # Uvicorn を起動
     ## 自動リロードモードと通常時で呼び方が異なる

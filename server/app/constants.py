@@ -69,7 +69,11 @@ AKEBI_LOG_PATH = LOGS_DIR / 'Akebi-HTTPS-Server.log'
 LIBRARY_DIR = BASE_DIR / 'thirdparty'
 
 # サードパーティーライブラリのあるパス
-LIBRARY_EXTENSION = ('.exe' if sys.platform == 'win32' else '.elf')
+LIBRARY_EXTENSION = ('.exe' if sys.platform == 'win32' else '' if sys.platform == 'darwin' else '.elf')
+
+# KonomiTV サーバー (Uvicorn) が内部でリッスンするループバックアドレス
+## macOS では 127.0.0.1 以外のループバックアドレスが既定で使えない (lo0 にエイリアスが無い) ため、127.0.0.1 を使う
+INTERNAL_HOST = ('127.0.0.1' if sys.platform == 'darwin' else '127.0.0.77')
 LIBRARY_PATH = {
     'Akebi': str(LIBRARY_DIR / 'Akebi/akebi-https-server') + LIBRARY_EXTENSION,
     'FFmpeg': str(LIBRARY_DIR / 'FFmpeg/ffmpeg') + LIBRARY_EXTENSION,

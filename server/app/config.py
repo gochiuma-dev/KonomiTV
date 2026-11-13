@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Annotated, Any, Literal, cast
 
 import httpx
@@ -250,6 +251,12 @@ class _ServerSettingsGeneral(BaseModel):
                 '利用するエンコーダーを FFmpeg・QSVEncC・NVEncC・VCEEncC のいずれかに変更してください。'
             )
         # arm64 なのにエンコーダーとして QSVEncC・NVEncC・VCEEncC が指定されている場合
+        # macOS では FFmpeg 以外のエンコーダーは使えない
+        if sys.platform == 'darwin' and encoder != 'FFmpeg':
+            raise ValueError(
+                'macOS では FFmpeg 以外のエンコーダーは使用できません。\n'
+                '利用するエンコーダーを FFmpeg に変更してください。'
+            )
         if current_arch == 'aarch64' and encoder in ['QSVEncC', 'NVEncC', 'VCEEncC']:
             raise ValueError(
                 'arm64 アーキテクチャでは QSVEncC・NVEncC・VCEEncC は使用できません。\n'
@@ -308,7 +315,23 @@ class _ServerSettingsServer(BaseModel):
         # ref: https://qiita.com/skokado/items/6e76762c68866d73570b
         current_process = psutil.Process()
         used_ports: list[int] = []
-        for conn in psutil.net_connections():
+        ## macOS では一般ユーザーだと psutil.net_connections() が AccessDenied になるため、lsof の結果を使う
+        try:
+            net_connections = psutil.net_connections()
+        except (psutil.AccessDenied, PermissionError):
+            net_connections = []
+            lsof = subprocess.run(['lsof', '-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            lsof_pid: int | None = None
+            for line in lsof.stdout.decode('utf-8', errors='ignore').splitlines():
+                if line.startswith('p'):
+                    lsof_pid = int(line[1:])
+                elif line.startswith('n') and ':' in line:
+                    try:
+                        lsof_port = int(line.rsplit(':', 1)[1])
+                    except ValueError:
+                        continue
+                    net_connections.append(cast(Any, SimpleNamespace(status='LISTEN', pid=lsof_pid, laddr=SimpleNamespace(port=lsof_port))))
+        for conn in net_connections:
             if conn.status == 'LISTEN':
                 if conn.pid is None:
                     continue

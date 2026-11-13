@@ -81,18 +81,20 @@ def GetMirakurunAPIEndpointURL(endpoint: str) -> str:
     return str(Config().general.mirakurun_url).rstrip('/') + endpoint
 
 
-def GetPlatformEnvironment() -> Literal['Windows', 'Linux', 'Linux-Docker', 'Linux-ARM'] | None:
+def GetPlatformEnvironment() -> Literal['Windows', 'Linux', 'Linux-Docker', 'Linux-ARM', 'macOS'] | None:
     """
     サーバーが稼働している動作環境を取得する
 
     Returns:
-        Literal['Windows', 'Linux', 'Linux-Docker', 'Linux-ARM'] | None: 動作環境を表す文字列 (サポート対象外の場合は None)
+        Literal['Windows', 'Linux', 'Linux-Docker', 'Linux-ARM', 'macOS'] | None: 動作環境を表す文字列 (サポート対象外の場合は None)
     """
 
     if sys.platform == 'win32':
         environment = 'Windows'
     elif sys.platform == 'linux':
         environment = 'Linux'
+    elif sys.platform == 'darwin':
+        return 'macOS'
     else:
         # Windows でも Linux でもない環境
         return None
