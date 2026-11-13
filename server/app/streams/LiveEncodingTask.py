@@ -10,6 +10,7 @@ import re
 import sys
 import time
 from collections.abc import AsyncIterator
+from fractions import Fraction
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 import aiofiles
@@ -213,6 +214,12 @@ class LiveEncodingTask:
                 else:
                     options.append(f'-vf yadif=mode=0:parity=-1:deint=1,scale={video_width}:{video_height}')
                     options.append(f'-r 30000/1001 -g {int(gop_length_second * 30)}')
+
+        ## h264_videotoolbox はサンプルアスペクト比 (-aspect 16:9) をビットストリームに書かないため、h264_metadata で書き込む
+        ## 書かれていないと 1440×1080 の映像が 4:3 のまま表示されてしまう (hevc_videotoolbox は書くので不要)
+        if sys.platform == 'darwin' and QUALITY[quality].is_hevc is False:
+            sample_aspect_ratio = Fraction(16 * video_height, 9 * video_width)
+            options.append(f'-bsf:v h264_metadata=sample_aspect_ratio={sample_aspect_ratio.numerator}/{sample_aspect_ratio.denominator}')
 
         # 音声
         ## 音声が 5.1ch かどうかに関わらず、ステレオにダウンミックスする

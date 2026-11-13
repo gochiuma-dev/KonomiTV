@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 from collections import deque
+from fractions import Fraction
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
 
 from biim.mpeg2ts import ts
@@ -182,6 +183,12 @@ class VideoEncodingTask:
             int_fps = math.ceil(self.video_stream.recorded_program.recorded_video.video_frame_rate)  # 29.97 -> 30
             options.append(f'-vf scale={video_width}:{video_height}')
             options.append(f'-g {int(self.GOP_LENGTH_SECOND * int_fps)}')
+
+        ## h264_videotoolbox はサンプルアスペクト比 (-aspect 16:9) をビットストリームに書かないため、h264_metadata で書き込む
+        ## 書かれていないと 1440×1080 の映像が 4:3 のまま表示されてしまう (hevc_videotoolbox は書くので不要)
+        if sys.platform == 'darwin' and QUALITY[quality].is_hevc is False:
+            sample_aspect_ratio = Fraction(16 * video_height, 9 * video_width)
+            options.append(f'-bsf:v h264_metadata=sample_aspect_ratio={sample_aspect_ratio.numerator}/{sample_aspect_ratio.denominator}')
 
         # 音声
         ## 音声が 5.1ch かどうかに関わらず、ステレオにダウンミックスする
