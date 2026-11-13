@@ -7,6 +7,7 @@ import asyncio
 import gc
 import os
 import re
+import sys
 import time
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, ClassVar, Literal, cast
@@ -157,14 +158,23 @@ class LiveEncodingTask:
 
         # 映像
         ## コーデック
-        if QUALITY[quality].is_hevc is True:
+        ## macOS では VideoToolbox (Apple Silicon のメディアエンジン) でエンコードする
+        ## ソフトウェアエンコード (libx264・libx265) と比べて CPU 使用率が H.264 で約半分・H.265 で約 1/8 になる
+        if sys.platform == 'darwin':
+            if QUALITY[quality].is_hevc is True:
+                options.append('-vcodec hevc_videotoolbox')  # H.265/HEVC (通信節約モード)
+            else:
+                options.append('-vcodec h264_videotoolbox')  # H.264
+        elif QUALITY[quality].is_hevc is True:
             options.append('-vcodec libx265')  # H.265/HEVC (通信節約モード)
         else:
             options.append('-vcodec libx264')  # H.264
 
         ## ビットレートと品質
         options.append(f'-flags +cgop -vb {QUALITY[quality].video_bitrate} -maxrate {QUALITY[quality].video_bitrate_max}')
-        options.append('-preset veryfast -aspect 16:9')
+        ## VideoToolbox には -preset が無いので、速度を優先する指定に置き換える
+        encoder_speed_option = '-realtime 1 -prio_speed 1' if sys.platform == 'darwin' else '-preset veryfast'
+        options.append(f'{encoder_speed_option} -aspect 16:9')
         if QUALITY[quality].is_hevc is True:
             options.append('-profile:v main')
         else:
