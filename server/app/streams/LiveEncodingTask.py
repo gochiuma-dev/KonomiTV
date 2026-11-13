@@ -215,11 +215,12 @@ class LiveEncodingTask:
                     options.append(f'-vf yadif=mode=0:parity=-1:deint=1,scale={video_width}:{video_height}')
                     options.append(f'-r 30000/1001 -g {int(gop_length_second * 30)}')
 
-        ## h264_videotoolbox はサンプルアスペクト比 (-aspect 16:9) をビットストリームに書かないため、h264_metadata で書き込む
-        ## 書かれていないと 1440×1080 の映像が 4:3 のまま表示されてしまう (hevc_videotoolbox は書くので不要)
-        if sys.platform == 'darwin' and QUALITY[quality].is_hevc is False:
+        ## VideoToolbox はサンプルアスペクト比 (-aspect 16:9) をビットストリームに書かないため、h264_metadata / hevc_metadata で書き込む
+        ## 書かれていないと 1440×1080 の映像が 4:3 のまま表示されてしまう
+        if sys.platform == 'darwin':
             sample_aspect_ratio = Fraction(16 * video_height, 9 * video_width)
-            options.append(f'-bsf:v h264_metadata=sample_aspect_ratio={sample_aspect_ratio.numerator}/{sample_aspect_ratio.denominator}')
+            metadata_filter = 'hevc_metadata' if QUALITY[quality].is_hevc is True else 'h264_metadata'
+            options.append(f'-bsf:v {metadata_filter}=sample_aspect_ratio={sample_aspect_ratio.numerator}/{sample_aspect_ratio.denominator}')
 
         # 音声
         ## 音声が 5.1ch かどうかに関わらず、ステレオにダウンミックスする
