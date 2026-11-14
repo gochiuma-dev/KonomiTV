@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import pathlib
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from typing import ClassVar, Literal, cast
@@ -60,6 +61,28 @@ class RecordedVideoSummary:
     file_modified_at: datetime
     file_size: int
     file_hash: str
+
+
+
+def IsOnNetworkVolume(path: str) -> bool:
+    """ 指定されたパスが macOS のネットワークボリューム (SMB・NFS・AFP・WebDAV) 上にあるかどうか """
+    if sys.platform != 'darwin':
+        return False
+    try:
+        import subprocess
+        result = subprocess.run(['/bin/df', '-P', path], capture_output=True, text=True, timeout=10)
+        lines = result.stdout.strip().splitlines()
+        if len(lines) < 2:
+            return False
+        mount_point = lines[-1].split()[-1]
+        mount_result = subprocess.run(['/sbin/mount'], capture_output=True, text=True, timeout=10)
+        for line in mount_result.stdout.splitlines():
+            if f' on {mount_point} (' in line:
+                fs_type = line.rsplit(' (', 1)[1].split(',')[0]
+                return fs_type in ('smbfs', 'nfs', 'afpfs', 'webdav')
+    except Exception:
+        return False
+    return False
 
 
 class RecordedScanTask:
@@ -1264,7 +1287,19 @@ class RecordedScanTask:
 
         try:
             # watchfiles によるファイル監視
-            async for changes in awatch(*watch_paths, recursive=True):
+            ## macOS の FSEvents は SMB / NFS などのネットワークボリュームで他の機械が書いた変更を通知しないため、
+            ## 録画フォルダにネットワークボリュームが含まれるときはポーリングで監視する (別の機械で録画している構成向け)
+            is_network_volume_included = sys.platform == 'darwin' and any(
+                IsOnNetworkVolume(path) for path in watch_paths
+            )
+            if is_network_volume_included:
+                logging.info('Recording folders include network volumes. Watching by polling (every 10 seconds).')
+            async for changes in awatch(
+                *watch_paths,
+                recursive = True,
+                force_polling = is_network_volume_included,
+                poll_delay_ms = 10000,
+            ):
                 if not self._is_running:
                     break
 

@@ -7,6 +7,7 @@ import math
 import pathlib
 import random
 import subprocess
+import sys
 import time
 from typing import Any, ClassVar, Literal, cast
 
@@ -1228,6 +1229,23 @@ class ThumbnailGenerator:
         if tile_png_data is None:
             logging.error(f'{log_prefix}: Failed to encode tile image as PNG.')
             return False
+
+        # macOS では Homebrew の FFmpeg に WebP エンコーダー (libwebp) が入っていないため、Pillow で WebP に圧縮保存する
+        if sys.platform == 'darwin':
+            try:
+                from PIL import Image
+                rgb_image = cv2.cvtColor(tile_image, cv2.COLOR_BGR2RGB)
+                with open(output_path, 'wb') as file:
+                    Image.fromarray(rgb_image).save(
+                        file,
+                        format = 'WEBP',
+                        quality = ThumbnailGenerator.WEBP_QUALITY_TILE,
+                        method = min(ThumbnailGenerator.WEBP_COMPRESSION, 6),
+                    )
+            except Exception as ex:
+                logging.error(f'{log_prefix}: Pillow tile image compression failed:', exc_info=ex)
+                return False
+            return True
 
         # FFmpeg でタイル画像を WebP に圧縮保存
         # 出力形式を -f webp で明示的に指定することで、.tmp などの拡張子でも正しく出力できる
