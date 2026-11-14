@@ -33,6 +33,7 @@ from app.routers import (
     ProgramsRouter,
     RecordingPresetsRouter,
     ReservationConditionsRouter,
+    ReservationsEPGStationRouter,
     ReservationsRouter,
     SeriesRouter,
     SettingsRouter,
@@ -44,6 +45,7 @@ from app.routers import (
 )
 from app.streams.LiveStream import LiveStream
 from app.utils.edcb.EDCBTuner import EDCBTuner
+from app.utils.EPGStationUtil import EPGStationUtil
 from app.utils.FastAPITaskUtil import repeat_every
 
 
@@ -73,6 +75,10 @@ app.include_router(VideosRouter.router)
 app.include_router(SeriesRouter.router)
 app.include_router(LiveStreamsRouter.router)
 app.include_router(VideoStreamsRouter.router)
+# バックエンドが Mirakurun で EPGStation の URL が設定されているときは、録画予約まわりの API を EPGStation に向ける
+## 同じパスの ReservationsRouter・RecordingPresetsRouter より先に登録して、こちらを優先させる
+if EPGStationUtil.isEnabled():
+    app.include_router(ReservationsEPGStationRouter.router)
 app.include_router(ReservationsRouter.router)
 app.include_router(ReservationConditionsRouter.router)
 app.include_router(RecordingPresetsRouter.router)

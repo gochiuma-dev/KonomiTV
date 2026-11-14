@@ -144,10 +144,19 @@ class _ServerSettingsGeneral(BaseModel):
     always_receive_tv_from_mirakurun: bool = False
     edcb_url: Annotated[Url, UrlConstraints(allowed_schemes=['tcp'])] = Url('tcp://127.0.0.1:4510/')
     mirakurun_url: Annotated[Url, UrlConstraints(allowed_schemes=['http', 'https'])] = Url('http://127.0.0.1:40772/')
+    # 録画予約のバックエンドとして使う EPGStation の URL (バックエンドが Mirakurun のときだけ使う / None なら録画予約は使えない)
+    epgstation_url: Annotated[Url, UrlConstraints(allowed_schemes=['http', 'https'])] | None = None
     encoder: Literal['FFmpeg', 'QSVEncC', 'NVEncC', 'VCEEncC', 'rkmppenc'] = 'FFmpeg'
     program_update_interval: Annotated[float, confloat(ge=0.1)] = 5.0
     debug: bool = False
     debug_encoder: bool = False
+
+    @field_validator('epgstation_url', mode='before')
+    def validate_epgstation_url(cls, epgstation_url: Any) -> Any:
+        # 設定画面で空欄にされたときは None (録画予約を使わない) として扱う
+        if isinstance(epgstation_url, str) and epgstation_url.strip() == '':
+            return None
+        return epgstation_url
 
     @field_validator('edcb_url')
     def validate_edcb_url(cls, edcb_url: Url, info: ValidationInfo) -> Url:

@@ -61,6 +61,17 @@
                 </v-text-field>
             </div>
             <div class="settings__item">
+                <div class="settings__item-heading">EPGStation の URL (録画予約)</div>
+                <div class="settings__item-label">
+                    バックエンドに Mirakurun が選択されているときに、録画予約の追加・変更・削除を EPGStation に任せます。<br>
+                    空欄にすると録画予約は使えません。例: http://192.168.1.10:8888/<br>
+                </div>
+                <v-text-field class="settings__item-form" color="primary" variant="outlined" hide-details
+                    :density="is_form_dense ? 'compact' : 'default'"
+                    v-model="server_settings.general.epgstation_url">
+                </v-text-field>
+            </div>
+            <div class="settings__item">
                 <div class="settings__item-heading">利用するエンコーダー</div>
                 <div class="settings__item-label">
                     FFmpeg はソフトウェアエンコーダーです。<br>

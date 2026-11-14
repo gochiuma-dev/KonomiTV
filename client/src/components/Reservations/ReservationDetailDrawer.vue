@@ -51,7 +51,7 @@
                 <div v-if="!isEDCBBackend && !isPastProgram && !hasRealReservation" class="status-banner status-banner--info mb-4">
                     <Icon icon="fluent:info-16-regular" class="status-banner__icon" />
                     <span class="status-banner__text">
-                        録画予約機能は EDCB バックエンド選択時のみ利用できます。
+                        録画予約機能は EDCB バックエンド選択時か、EPGStation が設定されているときのみ利用できます。
                     </span>
                 </div>
                 <!-- 番組情報 -->
@@ -266,10 +266,11 @@ const hasRealReservation = computed(() => hasReservation.value && !isMockReserva
 // 表示用の番組情報（予約があればそちらを優先）
 const displayProgram = computed(() => props.reservation?.program ?? props.program ?? null);
 
-// EDCB バックエンドかどうか
+// 録画予約が使えるかどうか (EDCB バックエンドか、Mirakurun バックエンドで EPGStation が設定されている)
 // サーバー設定がまだ取得されていない場合は EDCB と判定しない
 // (デフォルト値が 'EDCB' のため、未取得状態で誤って true を返すと Mirakurun バックエンドでも予約操作が有効化されてしまう)
-const isEDCBBackend = computed(() => serverSettingsStore.is_loaded === true && serverSettings.value.general.backend === 'EDCB');
+const isEDCBBackend = computed(() => serverSettingsStore.is_loaded === true && (serverSettings.value.general.backend === 'EDCB' ||
+    (serverSettings.value.general.backend === 'Mirakurun' && Boolean(serverSettings.value.general.epgstation_url))));
 
 // 録画設定タブを表示するかどうか
 // - 実際の予約がある場合: 表示 (既存予約の設定編集)
@@ -405,7 +406,7 @@ const handleAddReservation = async () => {
 
     // EDCB バックエンドでない場合はエラー
     if (!isEDCBBackend.value) {
-        Message.error('録画予約機能は EDCB バックエンド選択時のみ利用できます。');
+        Message.error('録画予約機能は EDCB バックエンド選択時か、EPGStation が設定されているときのみ利用できます。');
         return;
     }
 

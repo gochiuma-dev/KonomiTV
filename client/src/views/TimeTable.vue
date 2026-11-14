@@ -155,7 +155,8 @@ const serverSettings = computed(() => serverSettingsStore.server_settings);
 // EDCB バックエンドかどうか
 // サーバー設定がまだ取得されていない場合は EDCB と判定しない
 // (デフォルト値が 'EDCB' のため、未取得状態で誤って true を返すと Mirakurun バックエンドでも予約操作が有効化されてしまう)
-const isEDCBBackend = computed(() => serverSettingsStore.is_loaded === true && serverSettings.value.general.backend === 'EDCB');
+const isEDCBBackend = computed(() => serverSettingsStore.is_loaded === true && (serverSettings.value.general.backend === 'EDCB' ||
+    (serverSettings.value.general.backend === 'Mirakurun' && Boolean(serverSettings.value.general.epgstation_url))));
 
 // デフォルト録画設定のキャッシュ (初回 API 呼出時に取得され、以降はキャッシュから返される)
 let defaultRecordSettingsCache: IRecordSettings | null = null;

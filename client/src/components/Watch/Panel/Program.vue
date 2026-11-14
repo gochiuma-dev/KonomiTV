@@ -72,7 +72,7 @@
                 <!-- Mirakurun バックエンド: グレーアウト表示 -->
                 <template v-else>
                     <Icon icon="fluent:record-16-regular" width="17px" height="17px" style="margin-bottom: -1px" />
-                    <span style="margin-left: 5px;">録画開始 (EDCB 専用)</span>
+                    <span style="margin-left: 5px;">録画開始</span>
                 </template>
             </div>
         </section>
@@ -170,7 +170,9 @@ export default defineComponent({
             if (this.serverSettingsStore.is_loaded !== true) {
                 return false;
             }
-            return this.serverSettingsStore.server_settings.general.backend === 'EDCB';
+            // EPGStation が設定されていれば、Mirakurun バックエンドでも録画予約が使える
+            const general = this.serverSettingsStore.server_settings.general;
+            return general.backend === 'EDCB' || (general.backend === 'Mirakurun' && Boolean(general.epgstation_url));
         },
 
         // 現在の番組が録画中かどうか
@@ -285,7 +287,7 @@ export default defineComponent({
             }
             // Mirakurun バックエンドの場合は警告を表示
             if (this.isEDCBBackend !== true) {
-                Message.warning('録画予約機能は EDCB バックエンド選択時のみ利用できます。');
+                Message.warning('録画予約機能は EDCB バックエンド選択時か、EPGStation が設定されているときのみ利用できます。');
                 return;
             }
             // 未予約の場合は録画を開始
