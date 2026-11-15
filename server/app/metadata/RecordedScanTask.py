@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import os
 import pathlib
 import sys
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import ClassVar, Literal, cast
@@ -62,6 +64,49 @@ class RecordedVideoSummary:
     file_size: int
     file_hash: str
 
+
+
+def SnapshotFolders(paths: list[str]) -> dict[str, tuple[int, int]]:
+    """ フォルダ以下のファイルを {パス: (大きさ, 更新時刻 ns)} にする (中身は読まない) """
+    snapshot: dict[str, tuple[int, int]] = {}
+    for root_path in paths:
+        for dir_path, _, file_names in os.walk(root_path):
+            for file_name in file_names:
+                file_path = os.path.join(dir_path, file_name)
+                try:
+                    stat = os.stat(file_path)
+                except OSError:
+                    continue
+                snapshot[file_path] = (stat.st_size, stat.st_mtime_ns)
+    return snapshot
+
+
+async def PollRecordedFolders(paths: list[str], is_running: Callable[[], bool], interval: float = 10.0) -> AsyncIterator[set[tuple[Change, str]]]:
+    """
+    録画フォルダを一定間隔で見比べて、watchfiles の awatch() と同じ形 ({(Change, パス)}) で変更を返す
+    走査は別スレッドで行い、イベントループを止めない
+    """
+    previous = await asyncio.to_thread(SnapshotFolders, paths)
+    while is_running():
+        await asyncio.sleep(interval)
+        if not is_running():
+            break
+        try:
+            current = await asyncio.to_thread(SnapshotFolders, paths)
+        except Exception as ex:
+            logging.warning('Failed to poll recording folders:', exc_info=ex)
+            continue
+        changes: set[tuple[Change, str]] = set()
+        for file_path, info in current.items():
+            if file_path not in previous:
+                changes.add((Change.added, file_path))
+            elif previous[file_path] != info:
+                changes.add((Change.modified, file_path))
+        for file_path in previous.keys() - current.keys():
+            changes.add((Change.deleted, file_path))
+        previous = current
+        if len(changes) > 0:
+            yield changes
 
 
 def IsOnNetworkVolume(path: str) -> bool:
@@ -1288,18 +1333,18 @@ class RecordedScanTask:
         try:
             # watchfiles によるファイル監視
             ## macOS の FSEvents は SMB / NFS などのネットワークボリュームで他の機械が書いた変更を通知しないため、
-            ## 録画フォルダにネットワークボリュームが含まれるときはポーリングで監視する (別の機械で録画している構成向け)
+            ## 録画フォルダにネットワークボリュームが含まれるときは、ファイルの大きさと更新時刻を 10 秒ごとに見比べる自前の監視にする
+            ## (watchfiles の force_polling は監視の開始時にイベントループを止めたまま全ファイルを読みに行き、
+            ##  NAS に大きな録画があると起動が数分止まったため使わない)
             is_network_volume_included = sys.platform == 'darwin' and any(
                 IsOnNetworkVolume(path) for path in watch_paths
             )
             if is_network_volume_included:
                 logging.info('Recording folders include network volumes. Watching by polling (every 10 seconds).')
-            async for changes in awatch(
-                *watch_paths,
-                recursive = True,
-                force_polling = is_network_volume_included,
-                poll_delay_ms = 10000,
-            ):
+                change_stream = PollRecordedFolders(watch_paths, lambda: self._is_running)
+            else:
+                change_stream = awatch(*watch_paths, recursive=True)
+            async for changes in change_stream:
                 if not self._is_running:
                     break
 
