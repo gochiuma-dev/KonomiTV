@@ -33,6 +33,7 @@ from app.routers import (
     ProgramSearchEPGStationRouter,
     ProgramsRouter,
     RecordingPresetsRouter,
+    ReservationConditionsEPGStationRouter,
     ReservationConditionsRouter,
     ReservationsEPGStationRouter,
     ReservationsRouter,
@@ -84,6 +85,7 @@ app.include_router(VideoStreamsRouter.router)
 ## 同じパスの ReservationsRouter・RecordingPresetsRouter より先に登録して、こちらを優先させる
 if EPGStationUtil.isEnabled():
     app.include_router(ReservationsEPGStationRouter.router)
+    app.include_router(ReservationConditionsEPGStationRouter.router)
 app.include_router(ReservationsRouter.router)
 app.include_router(ReservationConditionsRouter.router)
 app.include_router(RecordingPresetsRouter.router)

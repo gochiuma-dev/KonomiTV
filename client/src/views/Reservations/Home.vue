@@ -27,6 +27,16 @@
                         :emptySubMessage="'番組表から録画予約を追加できます。'"
                         @more="$router.push('/reservations/all')"
                         @delete="handleReservationDeleted" />
+                    <!-- キーワード自動予約への入口 (EDCB か、EPGStation が設定されているときだけ) -->
+                    <div v-if="isReservationConditionAvailable" class="reservations-home-container__conditions" v-ripple
+                        @click="$router.push('/reservations/conditions')">
+                        <Icon icon="fluent:calendar-search-20-regular" width="26px" height="26px" />
+                        <div class="reservations-home-container__conditions-text">
+                            <div class="reservations-home-container__conditions-title">キーワード自動予約</div>
+                            <div class="reservations-home-container__conditions-description">条件に合う番組を自動で録画予約します。条件の追加・編集はこちらから</div>
+                        </div>
+                        <Icon icon="fluent:chevron-right-20-regular" width="22px" height="22px" />
+                    </div>
                 </div>
             </div>
         </main>
@@ -34,7 +44,7 @@
 </template>
 <script lang="ts" setup>
 
-import { onMounted, ref, onUnmounted } from 'vue';
+import { computed, onMounted, ref, onUnmounted } from 'vue';
 
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import HeaderBar from '@/components/HeaderBar.vue';
@@ -42,7 +52,19 @@ import Navigation from '@/components/Navigation.vue';
 import ReservationList from '@/components/Reservations/ReservationList.vue';
 import SPHeaderBar from '@/components/SPHeaderBar.vue';
 import Reservations, { IReservation } from '@/services/Reservations';
+import useServerSettingsStore from '@/stores/ServerSettingsStore';
 import { dayjs } from '@/utils';
+
+// キーワード自動予約が使えるかどうか (EDCB バックエンドか、Mirakurun バックエンドで EPGStation が設定されている)
+const serverSettingsStore = useServerSettingsStore();
+serverSettingsStore.fetchServerSettingsOnce();
+const isReservationConditionAvailable = computed(() => {
+    if (serverSettingsStore.is_loaded !== true) {
+        return false;
+    }
+    const general = serverSettingsStore.server_settings.general;
+    return general.backend === 'EDCB' || (general.backend === 'Mirakurun' && Boolean(general.epgstation_url));
+});
 
 // 放送が近い録画予約のリスト
 const upcomingReservations = ref<IReservation[]>([]);
@@ -183,6 +205,33 @@ onUnmounted(() => {
 
 
 
+
+    &__conditions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 24px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: rgb(var(--v-theme-background-lighten-1));
+        cursor: pointer;
+    }
+
+    &__conditions-text {
+        flex: 1;
+        min-width: 0;
+    }
+
+    &__conditions-title {
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    &__conditions-description {
+        margin-top: 2px;
+        font-size: 13px;
+        color: rgb(var(--v-theme-text-darken-1));
+    }
 
     &__upcoming-reservations--loading,
     &__recently-finished-reservations--loading,

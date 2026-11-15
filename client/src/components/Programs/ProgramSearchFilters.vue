@@ -319,12 +319,44 @@
                     </div>
                 </v-expansion-panel-text>
             </v-expansion-panel>
+            <v-expansion-panel v-if="isConditionMode">
+                <v-expansion-panel-title>
+                    <span class="program-search-filters__panel-title-text">
+                        <Icon icon="fluent:copy-16-filled" width="16px" height="16px" />
+                        重複する番組
+                    </span>
+                    <span class="program-search-filters__panel-status-badge"
+                        :class="{ 'program-search-filters__panel-status-badge--modified': localCondition.duplicate_title_check_scope !== 'None' }">
+                        {{ localCondition.duplicate_title_check_scope !== 'None' ? `${localCondition.duplicate_title_check_period_days}日間は避ける` : '避けない' }}
+                    </span>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                    <button type="button" class="program-search-filters__inline-toggle"
+                        :class="{ 'program-search-filters__inline-toggle--active': localCondition.duplicate_title_check_scope !== 'None' }"
+                        :aria-pressed="localCondition.duplicate_title_check_scope !== 'None'"
+                        @click="localCondition.duplicate_title_check_scope = localCondition.duplicate_title_check_scope === 'None' ? 'AllChannels' : 'None'">
+                        <Icon icon="fluent:checkmark-circle-16-filled" width="16px" height="16px" />
+                        録画済みの同じ番組は予約しない
+                    </button>
+                    <div v-if="localCondition.duplicate_title_check_scope !== 'None'" class="program-search-filters__duration-grid mt-3">
+                        <label class="program-search-filters__number-field">
+                            <span>期間</span>
+                            <input v-model.number="localCondition.duplicate_title_check_period_days"
+                                type="number"
+                                name="program-search-duplicate-period"
+                                min="0"
+                                inputmode="numeric">
+                            <span>日</span>
+                        </label>
+                    </div>
+                </v-expansion-panel-text>
+            </v-expansion-panel>
         </v-expansion-panels>
         <div class="program-search-filters__actions">
             <v-btn class="program-search-filters__submit" color="secondary" variant="flat" block
                 :loading="isSearching" @click="emitSearch">
-                <Icon icon="fluent:search-20-filled" width="20px" height="20px" class="mr-1" />
-                検索
+                <Icon :icon="isConditionMode ? 'fluent:save-20-filled' : 'fluent:search-20-filled'" width="20px" height="20px" class="mr-1" />
+                {{ submitLabel ?? '検索' }}
             </v-btn>
         </div>
     </aside>
@@ -379,6 +411,9 @@ const props = defineProps<{
     condition: IProgramSearchCondition;
     channels: ILiveChannel[];
     isSearching: boolean;
+    // キーワード自動予約条件の編集に使うとき: 重複番組の設定を出し、ボタンの文言を変える
+    isConditionMode?: boolean;
+    submitLabel?: string;
 }>();
 
 const emit = defineEmits<{
@@ -921,7 +956,13 @@ const copyDateRange = (index: number) => {
 
 const buildCondition = (): IProgramSearchCondition => {
     const condition = structuredClone(toRaw(localCondition.value));
-    condition.is_enabled = true;
+    // キーワード自動予約条件の編集では有効/無効を一覧側で切り替えるので、ここでは触らない
+    if (props.isConditionMode !== true) {
+        condition.is_enabled = true;
+    }
+    condition.duplicate_title_check_period_days = Number.isFinite(condition.duplicate_title_check_period_days)
+        ? Math.max(0, Math.floor(condition.duplicate_title_check_period_days))
+        : 6;
     condition.note = '';
     condition.keyword = condition.keyword ?? '';
     condition.exclude_keyword = condition.exclude_keyword ?? '';
@@ -966,8 +1007,11 @@ const buildCondition = (): IProgramSearchCondition => {
         : null;
 
     // 重複チェックはキーワード自動予約で予約を無効化するための条件なので、番組検索結果の絞り込みでは参照しない
-    condition.duplicate_title_check_scope = 'None';
-    condition.duplicate_title_check_period_days = 6;
+    // (キーワード自動予約条件の編集では、フォームの値をそのまま使う)
+    if (props.isConditionMode !== true) {
+        condition.duplicate_title_check_scope = 'None';
+        condition.duplicate_title_check_period_days = 6;
+    }
 
     return condition;
 };

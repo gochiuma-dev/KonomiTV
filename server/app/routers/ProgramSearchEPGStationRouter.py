@@ -127,7 +127,11 @@ def EncodeTimes(date_ranges: list[schemas.ProgramSearchConditionDate], is_exclud
             start_hour = hour
             while hour < 24 and week_hours[day * 24 + hour] is True:
                 hour += 1
-            times.append({'week': 1 << day, 'start': start_hour, 'range': hour - start_hour})
+            if hour - start_hour == 24:
+                # EPGStation の範囲は 1〜23 時間まで。終日は時刻を付けずに曜日だけで表す
+                times.append({'week': 1 << day})
+            else:
+                times.append({'week': 1 << day, 'start': start_hour, 'range': hour - start_hour})
     return times
 
 
@@ -141,23 +145,28 @@ def EncodeEPGStationSearchOption(condition: schemas.ProgramSearchCondition) -> d
 
     is_title_only = condition.is_title_only
     option: dict[str, Any] = {
-        # キーワードは EDCB と同じく空白区切りの AND (EPGStation が半角にそろえて分ける)
-        'keyCS': condition.is_case_sensitive,
-        'keyRegExp': condition.is_regex_search_enabled,
-        'name': True,
-        'description': not is_title_only,
-        'extended': not is_title_only,
-        'ignoreKeyCS': condition.is_case_sensitive,
-        'ignoreKeyRegExp': condition.is_regex_search_enabled,
-        'ignoreName': True,
-        'ignoreDescription': not is_title_only,
-        'ignoreExtended': not is_title_only,
         'isFree': condition.broadcast_type == 'FreeOnly',
     }
+    # キーワードは EDCB と同じく空白区切りの AND (EPGStation が半角にそろえて分ける)
+    ## EPGStation のルールは、キーワードが無いのにキーワードのオプションが付いていると受け付けないので、キーワードがあるときだけ付ける
     if condition.keyword.strip() != '':
-        option['keyword'] = condition.keyword.strip()
+        option.update({
+            'keyword': condition.keyword.strip(),
+            'keyCS': condition.is_case_sensitive,
+            'keyRegExp': condition.is_regex_search_enabled,
+            'name': True,
+            'description': not is_title_only,
+            'extended': not is_title_only,
+        })
     if condition.exclude_keyword.strip() != '':
-        option['ignoreKeyword'] = condition.exclude_keyword.strip()
+        option.update({
+            'ignoreKeyword': condition.exclude_keyword.strip(),
+            'ignoreKeyCS': condition.is_case_sensitive,
+            'ignoreKeyRegExp': condition.is_regex_search_enabled,
+            'ignoreName': True,
+            'ignoreDescription': not is_title_only,
+            'ignoreExtended': not is_title_only,
+        })
 
     # チャンネル: None なら全部の種別、リストならチャンネル ID (networkId × 10^5 + serviceId)
     ## EPGStation のチャンネル ID にトランスポートストリーム ID は入らないので、それは見ない

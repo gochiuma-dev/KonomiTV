@@ -18,6 +18,11 @@
                                 :channels="allChannels"
                                 :is-searching="isSearching"
                                 @search="executeSearch" />
+                            <v-btn v-if="isReservationConditionAvailable" class="program-search-container__condition-button"
+                                color="primary" variant="tonal" block :loading="isAddingCondition" @click="addReservationCondition">
+                                <Icon icon="fluent:calendar-add-20-filled" width="20px" height="20px" class="mr-1" />
+                                この条件で自動予約
+                            </v-btn>
                         </div>
                         <ReservationList
                             :title="resultTitle"
@@ -52,6 +57,11 @@
                 :channels="allChannels"
                 :is-searching="isSearching"
                 @search="executeSearchFromDrawer" />
+            <v-btn v-if="isReservationConditionAvailable" class="program-search-container__condition-button"
+                color="primary" variant="tonal" block :loading="isAddingCondition" @click="addReservationCondition">
+                <Icon icon="fluent:calendar-add-20-filled" width="20px" height="20px" class="mr-1" />
+                この条件で自動予約
+            </v-btn>
         </aside>
     </div>
 </template>
@@ -68,8 +78,11 @@ import ReservationList from '@/components/Reservations/ReservationList.vue';
 import SPHeaderBar from '@/components/SPHeaderBar.vue';
 import { IChannel, ILiveChannel } from '@/services/Channels';
 import Programs, { IProgram, IProgramSearchCondition } from '@/services/Programs';
+import ReservationConditions from '@/services/ReservationConditions';
 import Reservations, { IRecordSettings, IRecordSettingsDefault, IReservation } from '@/services/Reservations';
+import Message from '@/message';
 import useChannelsStore from '@/stores/ChannelsStore';
+import useServerSettingsStore from '@/stores/ServerSettingsStore';
 import useUserStore from '@/stores/UserStore';
 import Utils, { dayjs } from '@/utils';
 
@@ -123,6 +136,37 @@ const allChannels = computed<ILiveChannel[]>(() => {
     // チャンネル種別ごとの配列を検索結果用の1本の配列に変換する
     return Object.values(channelsStore.channels_list).flat();
 });
+
+// キーワード自動予約が使えるかどうか (EDCB バックエンドか、Mirakurun バックエンドで EPGStation が設定されている)
+const serverSettingsStore = useServerSettingsStore();
+serverSettingsStore.fetchServerSettingsOnce();
+const isReservationConditionAvailable = computed(() => {
+    if (serverSettingsStore.is_loaded !== true) {
+        return false;
+    }
+    const general = serverSettingsStore.server_settings.general;
+    return general.backend === 'EDCB' || (general.backend === 'Mirakurun' && Boolean(general.epgstation_url));
+});
+const isAddingCondition = ref(false);
+
+// いまの検索条件をキーワード自動予約条件として登録する
+const addReservationCondition = async () => {
+    const condition = structuredClone(toRaw(searchCondition.value));
+    // 何も絞り込んでいない条件はすべての番組を予約してしまうので受け付けない
+    if (condition.keyword.trim() === '' && condition.genre_ranges === null && condition.date_ranges === null) {
+        Message.warning('キーワードかジャンル・日時のどれかを指定してから自動予約にしてください。');
+        return;
+    }
+    isAddingCondition.value = true;
+    condition.is_enabled = true;
+    const recordSettings = defaultRecordSettings.value ?? structuredClone(IRecordSettingsDefault);
+    const isSuccess = await ReservationConditions.addReservationCondition(condition, recordSettings);
+    isAddingCondition.value = false;
+    if (isSuccess === true) {
+        Message.success('キーワード自動予約に追加しました。録画予約 → キーワード自動予約 から確認・編集できます。');
+        isFilterDrawerOpen.value = false;
+    }
+};
 
 const channelMap = computed(() => {
     // 検索結果は channel_id だけを持つため、予約カードへ渡すチャンネルを先に引ける形にする
@@ -404,6 +448,11 @@ onBeforeUnmount(() => {
         @include smartphone-vertical {
             display: block;
         }
+    }
+
+    &__condition-button {
+        margin-top: 12px;
+        letter-spacing: 0;
     }
 
     &__filters {

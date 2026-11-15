@@ -610,7 +610,9 @@ async def TimeTableAPI(
     # バックエンドが Mirakurun で EPGStation が設定されている場合は、EPGStation から予約情報を取得
     elif EPGStationUtil.isEnabled():
         try:
-            from app.routers.ReservationsEPGStationRouter import GetTimeTableReservations
+            from app.routers.ReservationsEPGStationRouter import (
+                GetTimeTableReservations,
+            )
             reservations_by_program_id, reservations_by_channel_time = await GetTimeTableReservations(channels_result)
         except Exception as ex:
             # 予約情報の取得に失敗しても番組表自体は返す
