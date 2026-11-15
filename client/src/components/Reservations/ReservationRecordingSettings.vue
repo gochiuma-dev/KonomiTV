@@ -28,8 +28,17 @@
             </v-select>
         </div>
 
+        <!-- EPGStation の手動予約: 変えられる設定が無いことを伝える -->
+        <div v-if="isEPGStationBackend && !isEPGStationRuleReservation" class="reservation-recording-settings__section">
+            <div class="reservation-recording-settings__label">録画設定 (EPGStation)</div>
+            <div class="reservation-recording-settings__description mb-0">
+                録画は EPGStation が行います。EPGStation には予約ごとの録画設定 (優先度・保存先・マージンなど) がないため、ここで変えられる設定はありません。<br>
+                録画をやめるときは、予約を削除してください。保存先やファイル名は EPGStation の設定 (config.yml) で決まります。
+            </div>
+        </div>
+
         <!-- 録画予約の有効/無効 -->
-        <div class="reservation-recording-settings__section">
+        <div v-if="!isEPGStationBackend || isEPGStationRuleReservation" class="reservation-recording-settings__section">
             <div class="reservation-recording-settings__header">
                 <div class="reservation-recording-settings__label">録画予約の有効/無効</div>
                 <v-switch
@@ -48,192 +57,195 @@
             </div>
         </div>
 
-        <!-- 録画予約の優先度 -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">録画予約の優先度</div>
-            <div class="reservation-recording-settings__description mb-0">
-                放送時間が重なりチューナーが足りないときは、より優先度が高い予約から優先的に録画します。
-            </div>
-            <div class="reservation-recording-settings__slider">
-                <v-slider
-                    :disabled="reservation.is_recording_in_progress"
-                    v-model="settings.priority"
-                    :min="1"
-                    :max="5"
-                    :step="1"
-                    color="primary"
-                    density="compact"
-                    show-ticks="always"
-                    thumb-label
-                    hide-details
-                    @update:model-value="handleChange">
-                </v-slider>
-            </div>
-        </div>
-
-        <!-- 録画フォルダのパス -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">録画フォルダのパス</div>
-            <div class="reservation-recording-settings__description">
-                空欄にすると、デフォルトの録画フォルダに保存されます。
-            </div>
-            <v-text-field
-                :disabled="reservation.is_recording_in_progress"
-                v-model="recordingFolderPath"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                hide-details
-                :placeholder="versionStore.is_linux_environment ? '/mnt/hdd/Records/2025年春アニメ' : 'E:\\Records\\2025年春アニメ'"
-                @update:model-value="handleChange">
-            </v-text-field>
-        </div>
-
-        <!-- 録画ファイル名テンプレート -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">録画ファイル名テンプレート (マクロ)</div>
-            <div class="reservation-recording-settings__description">
-                空欄にすると、デフォルトの録画ファイル名テンプレート (マクロ) が録画ファイル名の変更に利用されます。<br>
-                <div class="mt-1">
-                    <a class="link" href="https://github.com/xtne6f/EDCB/blob/work-plus-s/Document/Readme_EpgTimer.txt#L929-L1008" target="_blank">テンプレート構文の一覧</a> / <a class="link" href="https://github.com/xtne6f/EDCB/blob/work-plus-s/Document/Readme_Mod.txt#%E3%83%9E%E3%82%AF%E3%83%AD" target="_blank">xtne6f 版での追加差分</a>
+        <!-- ここから下は EDCB の録画設定。EPGStation には予約ごとの設定が無いので出さない -->
+        <template v-if="!isEPGStationBackend">
+            <!-- 録画予約の優先度 -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">録画予約の優先度</div>
+                <div class="reservation-recording-settings__description mb-0">
+                    放送時間が重なりチューナーが足りないときは、より優先度が高い予約から優先的に録画します。
+                </div>
+                <div class="reservation-recording-settings__slider">
+                    <v-slider
+                        :disabled="reservation.is_recording_in_progress"
+                        v-model="settings.priority"
+                        :min="1"
+                        :max="5"
+                        :step="1"
+                        color="primary"
+                        density="compact"
+                        show-ticks="always"
+                        thumb-label
+                        hide-details
+                        @update:model-value="handleChange">
+                    </v-slider>
                 </div>
             </div>
-            <v-text-field
-                :disabled="reservation.is_recording_in_progress"
-                v-model="recordingFileNameTemplate"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                hide-details
-                placeholder="$ZtoH(Title)$.ts"
-                @update:model-value="handleChange">
-            </v-text-field>
-        </div>
 
-        <!-- 録画マージン -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">録画マージン (秒)</div>
-            <div class="reservation-recording-settings__description">
-                番組開始時刻の何秒前から録画を開始し、番組終了時刻の何秒後に録画を終了するかの設定です。最低でも5秒以上をおすすめします。(0秒だと番組の冒頭/末尾が欠けてしまいます。)
-            </div>
-            <div class="reservation-recording-settings__margin-default">
-                <v-checkbox
+            <!-- 録画フォルダのパス -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">録画フォルダのパス</div>
+                <div class="reservation-recording-settings__description">
+                    空欄にすると、デフォルトの録画フォルダに保存されます。
+                </div>
+                <v-text-field
                     :disabled="reservation.is_recording_in_progress"
-                    id="use-default-margin"
-                    v-model="useDefaultMargin"
-                    color="primary"
-                    density="compact"
-                    hide-details
-                    @update:model-value="handleMarginDefaultChange">
-                </v-checkbox>
-                <label class="reservation-recording-settings__margin-default-text" for="use-default-margin"
-                    style="user-select: none;">
-                    {{ marginDefaultLabel }}
-                </label>
-            </div>
-            <div class="reservation-recording-settings__margin-controls">
-                <v-text-field
-                    :disabled="reservation.is_recording_in_progress || useDefaultMargin"
-                    v-model.number="settings.recording_start_margin"
+                    v-model="recordingFolderPath"
                     color="primary"
                     variant="outlined"
                     density="compact"
-                    type="number"
                     hide-details
-                    prefix="番組開始"
-                    suffix="秒前"
-                    style="width: 160px;"
+                    :placeholder="versionStore.is_linux_environment ? '/mnt/hdd/Records/2025年春アニメ' : 'E:\\Records\\2025年春アニメ'"
                     @update:model-value="handleChange">
                 </v-text-field>
+            </div>
+
+            <!-- 録画ファイル名テンプレート -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">録画ファイル名テンプレート (マクロ)</div>
+                <div class="reservation-recording-settings__description">
+                    空欄にすると、デフォルトの録画ファイル名テンプレート (マクロ) が録画ファイル名の変更に利用されます。<br>
+                    <div class="mt-1">
+                        <a class="link" href="https://github.com/xtne6f/EDCB/blob/work-plus-s/Document/Readme_EpgTimer.txt#L929-L1008" target="_blank">テンプレート構文の一覧</a> / <a class="link" href="https://github.com/xtne6f/EDCB/blob/work-plus-s/Document/Readme_Mod.txt#%E3%83%9E%E3%82%AF%E3%83%AD" target="_blank">xtne6f 版での追加差分</a>
+                    </div>
+                </div>
                 <v-text-field
-                    :disabled="reservation.is_recording_in_progress || useDefaultMargin"
-                    v-model.number="settings.recording_end_margin"
+                    :disabled="reservation.is_recording_in_progress"
+                    v-model="recordingFileNameTemplate"
                     color="primary"
                     variant="outlined"
                     density="compact"
-                    type="number"
                     hide-details
-                    prefix="番組終了"
-                    suffix="秒後"
-                    style="width: 166px;"
+                    placeholder="$ZtoH(Title)$.ts"
                     @update:model-value="handleChange">
                 </v-text-field>
             </div>
-        </div>
 
-        <!-- 字幕データ録画設定 -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">字幕データ録画設定</div>
-            <div class="reservation-recording-settings__description">
-                字幕データはほとんど録画容量を消費しません。<br>
-                [録画する] に設定しておくことを強くおすすめします。
+            <!-- 録画マージン -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">録画マージン (秒)</div>
+                <div class="reservation-recording-settings__description">
+                    番組開始時刻の何秒前から録画を開始し、番組終了時刻の何秒後に録画を終了するかの設定です。最低でも5秒以上をおすすめします。(0秒だと番組の冒頭/末尾が欠けてしまいます。)
+                </div>
+                <div class="reservation-recording-settings__margin-default">
+                    <v-checkbox
+                        :disabled="reservation.is_recording_in_progress"
+                        id="use-default-margin"
+                        v-model="useDefaultMargin"
+                        color="primary"
+                        density="compact"
+                        hide-details
+                        @update:model-value="handleMarginDefaultChange">
+                    </v-checkbox>
+                    <label class="reservation-recording-settings__margin-default-text" for="use-default-margin"
+                        style="user-select: none;">
+                        {{ marginDefaultLabel }}
+                    </label>
+                </div>
+                <div class="reservation-recording-settings__margin-controls">
+                    <v-text-field
+                        :disabled="reservation.is_recording_in_progress || useDefaultMargin"
+                        v-model.number="settings.recording_start_margin"
+                        color="primary"
+                        variant="outlined"
+                        density="compact"
+                        type="number"
+                        hide-details
+                        prefix="番組開始"
+                        suffix="秒前"
+                        style="width: 160px;"
+                        @update:model-value="handleChange">
+                    </v-text-field>
+                    <v-text-field
+                        :disabled="reservation.is_recording_in_progress || useDefaultMargin"
+                        v-model.number="settings.recording_end_margin"
+                        color="primary"
+                        variant="outlined"
+                        density="compact"
+                        type="number"
+                        hide-details
+                        prefix="番組終了"
+                        suffix="秒後"
+                        style="width: 166px;"
+                        @update:model-value="handleChange">
+                    </v-text-field>
+                </div>
             </div>
-            <v-select
-                :disabled="reservation.is_recording_in_progress"
-                v-model="settings.caption_recording_mode"
-                :items="captionRecordingOptions"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                hide-details
-                @update:model-value="handleChange">
-            </v-select>
-        </div>
 
-        <!-- データ放送録画設定 -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">データ放送録画設定</div>
-            <div class="reservation-recording-settings__description">
-                データ放送は30分で 500MB 以上録画容量を消費する上、KonomiTV は録画再生時のデータ放送表示に非対応です。<br>
-                [録画しない] に設定しておくことを強くおすすめします。
+            <!-- 字幕データ録画設定 -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">字幕データ録画設定</div>
+                <div class="reservation-recording-settings__description">
+                    字幕データはほとんど録画容量を消費しません。<br>
+                    [録画する] に設定しておくことを強くおすすめします。
+                </div>
+                <v-select
+                    :disabled="reservation.is_recording_in_progress"
+                    v-model="settings.caption_recording_mode"
+                    :items="captionRecordingOptions"
+                    color="primary"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    @update:model-value="handleChange">
+                </v-select>
             </div>
-            <v-select
-                :disabled="reservation.is_recording_in_progress"
-                v-model="settings.data_broadcasting_recording_mode"
-                :items="dataBroadcastingRecordingOptions"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                hide-details
-                @update:model-value="handleChange">
-            </v-select>
-        </div>
 
-        <!-- 録画後動作設定 -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">録画後動作設定</div>
-            <div class="reservation-recording-settings__description">
-                通常は [何もしない] のままで大丈夫です。録画後に録画 PC をスリープさせておきたい方のみ設定してください。環境によっては復帰できず以降の録画に失敗することがあります。
+            <!-- データ放送録画設定 -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">データ放送録画設定</div>
+                <div class="reservation-recording-settings__description">
+                    データ放送は30分で 500MB 以上録画容量を消費する上、KonomiTV は録画再生時のデータ放送表示に非対応です。<br>
+                    [録画しない] に設定しておくことを強くおすすめします。
+                </div>
+                <v-select
+                    :disabled="reservation.is_recording_in_progress"
+                    v-model="settings.data_broadcasting_recording_mode"
+                    :items="dataBroadcastingRecordingOptions"
+                    color="primary"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    @update:model-value="handleChange">
+                </v-select>
             </div>
-            <v-select
-                :disabled="reservation.is_recording_in_progress"
-                v-model="settings.post_recording_mode"
-                :items="postRecordingOptions"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                hide-details
-                @update:model-value="handleChange">
-            </v-select>
-        </div>
 
-        <!-- 録画後実行スクリプトのパス -->
-        <div class="reservation-recording-settings__section">
-            <div class="reservation-recording-settings__label">録画後実行スクリプトのパス</div>
-            <div class="reservation-recording-settings__description">
-                通常は空欄のままで大丈夫です。録画後に指定の {{ versionStore.is_linux_environment ? '.sh / .lua' : '.bat / .ps1 / .lua' }} スクリプトを実行させたい方のみ設定してください。
+            <!-- 録画後動作設定 -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">録画後動作設定</div>
+                <div class="reservation-recording-settings__description">
+                    通常は [何もしない] のままで大丈夫です。録画後に録画 PC をスリープさせておきたい方のみ設定してください。環境によっては復帰できず以降の録画に失敗することがあります。
+                </div>
+                <v-select
+                    :disabled="reservation.is_recording_in_progress"
+                    v-model="settings.post_recording_mode"
+                    :items="postRecordingOptions"
+                    color="primary"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    @update:model-value="handleChange">
+                </v-select>
             </div>
-            <v-text-field
-                :disabled="reservation.is_recording_in_progress"
-                v-model="settings.post_recording_bat_file_path"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                hide-details
-                :placeholder="versionStore.is_linux_environment ? '/var/local/edcb/transcode.sh' : 'C:\\DTV\\EDCB\\Transcode.bat'"
-                @update:model-value="handleChange">
-            </v-text-field>
-        </div>
+
+            <!-- 録画後実行スクリプトのパス -->
+            <div class="reservation-recording-settings__section">
+                <div class="reservation-recording-settings__label">録画後実行スクリプトのパス</div>
+                <div class="reservation-recording-settings__description">
+                    通常は空欄のままで大丈夫です。録画後に指定の {{ versionStore.is_linux_environment ? '.sh / .lua' : '.bat / .ps1 / .lua' }} スクリプトを実行させたい方のみ設定してください。
+                </div>
+                <v-text-field
+                    :disabled="reservation.is_recording_in_progress"
+                    v-model="settings.post_recording_bat_file_path"
+                    color="primary"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    :placeholder="versionStore.is_linux_environment ? '/var/local/edcb/transcode.sh' : 'C:\\DTV\\EDCB\\Transcode.bat'"
+                    @update:model-value="handleChange">
+                </v-text-field>
+            </div>
+        </template>
     </div>
 </template>
 <script lang="ts" setup>
@@ -242,6 +254,7 @@ import { objectHash } from 'ohash';
 import { ref, computed, watch, onMounted, toRaw } from 'vue';
 
 import { type IReservation, type IRecordSettings, type IRecordSettingsPresets } from '@/services/Reservations';
+import useServerSettingsStore from '@/stores/ServerSettingsStore';
 import useVersionStore from '@/stores/VersionStore';
 
 // Props
@@ -259,6 +272,14 @@ const emit = defineEmits<{
 
 // ストア
 const versionStore = useVersionStore();
+const serverSettingsStore = useServerSettingsStore();
+
+// 録画予約を EPGStation が受け持っているかどうか (Mirakurun バックエンドで EPGStation の URL が設定されている)
+// EPGStation には予約ごとの録画設定が無く、変えられるのはルール (キーワード自動予約) から入った予約の有効/無効 (除外) だけ
+const isEPGStationBackend = computed(() => serverSettingsStore.is_loaded === true &&
+    serverSettingsStore.server_settings.general.backend === 'Mirakurun' &&
+    Boolean(serverSettingsStore.server_settings.general.epgstation_url));
+const isEPGStationRuleReservation = computed(() => props.reservation.comment === 'EPG自動予約');
 
 // 設定のコピーを作成（元の設定を変更しないため）
 const settings = ref<IRecordSettings>(structuredClone(toRaw(props.reservation.record_settings)));
