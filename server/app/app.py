@@ -30,6 +30,7 @@ from app.routers import (
     LiveStreamsRouter,
     MaintenanceRouter,
     NiconicoRouter,
+    ProgramSearchEPGStationRouter,
     ProgramsRouter,
     RecordingPresetsRouter,
     ReservationConditionsRouter,
@@ -69,6 +70,10 @@ app = FastAPI(
 )
 
 # ルーターの追加
+# バックエンドが Mirakurun で EPGStation の URL が設定されているときは、番組検索 API を EPGStation に向ける
+## 同じパスの ProgramsRouter より先に登録して、こちらを優先させる
+if EPGStationUtil.isEnabled():
+    app.include_router(ProgramSearchEPGStationRouter.router)
 app.include_router(ChannelsRouter.router)
 app.include_router(ProgramsRouter.router)
 app.include_router(VideosRouter.router)

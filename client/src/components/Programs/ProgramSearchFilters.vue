@@ -335,6 +335,7 @@ import { computed, nextTick, ref, toRaw, watch } from 'vue';
 
 import type { ChannelType, ILiveChannel } from '@/services/Channels';
 import type { IProgramSearchCondition, IProgramSearchConditionDate } from '@/services/Programs';
+import useServerSettingsStore from '@/stores/ServerSettingsStore';
 
 import Utils, { ProgramUtils } from '@/utils';
 
@@ -463,8 +464,16 @@ const channelTypeOptions = computed<ChannelTypeOption[]>(() => {
     return allChannelTypeOptions.filter((channelType) => availableChannelTypes.has(channelType.value));
 });
 
+// チャンネルの候補をバックエンドに合わせるため、サーバー設定を読んでおく (取得済みなら何もしない)
+const serverSettingsStore = useServerSettingsStore();
+serverSettingsStore.fetchServerSettingsOnce();
+
 const selectableChannels = computed(() => {
     // EDCB の service_list にはトランスポートストリーム ID が必須なので、欠けているチャンネルは候補から外す
+    // EPGStation で検索するとき (Mirakurun バックエンド) はトランスポートストリーム ID を使わないので、全チャンネルを候補にする
+    if (serverSettingsStore.is_loaded === true && serverSettingsStore.server_settings.general.backend === 'Mirakurun') {
+        return props.channels;
+    }
     return props.channels.filter((channel) => channel.transport_stream_id !== null);
 });
 
